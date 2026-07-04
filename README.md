@@ -3,7 +3,7 @@
 ## Fitur
 
 - ✌️ **Peace sign → blur** — angkat dua jari (telunjuk + tengah), layar otomatis nge-blur
-- 🫶 **Gesture hati (dua tangan) → hujan hati** — dekatkan jempol dan telunjuk dari kedua tangan sampai bentuk hati, nanti muncul partikel hati beterbangan di layar (ada yang persis di posisi tangan, ada juga yang random di sekitar layar)
+- 🫶 **Gesture hati (dua tangan) → hujan hati** ["💖", "💕", "💗", "💓", "💘", "🩷", "❤️"] — dekatkan jempol dan telunjuk dari kedua tangan sampai bentuk hati, nanti muncul partikel hati beterbangan di layar (ada yang persis di posisi tangan, ada juga yang random di sekitar layar)
 - Semua deteksi jalan real-time pakai webcam, tanpa perlu training model sendiri (full pakai MediaPipe Hands)
 
 ## Cara jalanin

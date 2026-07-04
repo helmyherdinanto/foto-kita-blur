@@ -1,5 +1,11 @@
 # FOTO KITA BLUR 📸
 
+---
+🌐 **Coba langsung di Web tanpa install!**  
+Kamu bisa langsung mengakses dan mencoba aplikasi ini langsung melalui web browser HP/PC (tanpa perlu install apa pun) lewat link berikut:  
+👉 **[https://helmyherdinanto.github.io/foto-kita-blur/](https://helmyherdinanto.github.io/foto-kita-blur/)**
+---
+
 ## Fitur
 
 - ✌️ **Peace sign → blur** — angkat dua jari (telunjuk + tengah), layar otomatis nge-blur

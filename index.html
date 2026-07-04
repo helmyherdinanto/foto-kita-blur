@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Foto Kita Blur</title>
+<style>
+  :root {
+    --bg: #0b0c10;
+    --card: #16181d;
+    --accent: #ff5c8a;
+    --text: #f2f2f2;
+    --muted: #9a9ea6;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, #1b1e26, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 720px;
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  }
+
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+    text-align: center;
+  }
+
+  p.subtitle {
+    margin: 0 0 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  #container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: 14px;
+    background: #000;
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    transition: filter 0.15s ease-out;
+    display: block;
+  }
+
+  video.is-blurred {
+    filter: blur(16px) saturate(1.1);
+  }
+
+  .heart {
+    position: absolute;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: floatUp 1.2s ease-out forwards;
+    user-select: none;
+  }
+
+  @keyframes floatUp {
+    0%   { transform: translateY(0) scale(0.6);  opacity: 0; }
+    15%  { transform: translateY(-14px) scale(1); opacity: 1; }
+    100% { transform: translateY(-110px) scale(1.05); opacity: 0; }
+  }
+
+  #status {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+
+  #overlay-message {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    background: #000;
+  }
+
+  .hidden { display: none !important; }
+
+  .footer-note {
+    margin-top: 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📸 Foto Kita Blur</h1>
+  <p class="subtitle">✌️ Angkat 2 jari untuk blur &nbsp;·&nbsp; 🫶 Bentuk hati pakai 2 tangan untuk efek love</p>
+
+  <div id="container">
+    <video id="video" autoplay playsinline muted></video>
+    <div id="overlay-message">Memuat kamera &amp; model deteksi tangan…</div>
+    <div id="status" class="hidden">✌️ Peace = blur &nbsp;·&nbsp; 🫶 Hati 2 tangan = love</div>
+  </div>
+
+  <p class="footer-note">Semua deteksi jalan langsung di browser kamu — tidak ada video yang dikirim ke server mana pun.</p>
+</div>
+
+<script type="module">
+  import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+  const video = document.getElementById("video");
+  const container = document.getElementById("container");
+  const overlayMessage = document.getElementById("overlay-message");
+  const status = document.getElementById("status");
+
+  const LOVE_EMOJIS = ["💖", "💕", "💗", "💓", "💘", "🩷", "❤️"];
+
+  let handLandmarker = null;
+  let lastVideoTime = -1;
+  let ambientCooldown = 0;
+
+  function dist(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function fingerUp(lm, tip, pip) {
+    return lm[tip].y < lm[pip].y;
+  }
+
+  function isPeace(lm) {
+    const indexUp = fingerUp(lm, 8, 6);
+    const middleUp = fingerUp(lm, 12, 10);
+    const ringUp = fingerUp(lm, 16, 14);
+    const pinkyUp = fingerUp(lm, 20, 18);
+    return indexUp && middleUp && !ringUp && !pinkyUp;
+  }
+
+  function isTwoHandHeart(handsLm) {
+    if (handsLm.length < 2) return null;
+
+    const [lm1, lm2] = handsLm;
+    const thumbDist = dist(lm1[4], lm2[4]);
+    const indexDist = dist(lm1[8], lm2[8]);
+
+    if (thumbDist < 0.10 && indexDist < 0.10) {
+      const cx = (lm1[4].x + lm2[4].x + lm1[8].x + lm2[8].x) / 4;
+      const cy = (lm1[4].y + lm2[4].y + lm1[8].y + lm2[8].y) / 4;
+      return { x: cx, y: cy };
+    }
+    return null;
+  }
+
+  function spawnHeart(xPx, yPx, size) {
+    const el = document.createElement("span");
+    el.className = "heart";
+    el.textContent = LOVE_EMOJIS[Math.floor(Math.random() * LOVE_EMOJIS.length)];
+    el.style.left = `${xPx - size / 2}px`;
+    el.style.top = `${yPx - size / 2}px`;
+    el.style.fontSize = `${size}px`;
+    container.appendChild(el);
+    el.addEventListener("animationend", () => el.remove());
+  }
+
+  async function init() {
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numHands: 2
+    });
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
+
+    video.srcObject = stream;
+    await video.play();
+
+    overlayMessage.classList.add("hidden");
+    status.classList.remove("hidden");
+
+    requestAnimationFrame(loop);
+  }
+
+  function loop() {
+    if (handLandmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+
+      const result = handLandmarker.detectForVideo(video, performance.now());
+      const handsLm = result.landmarks || [];
+
+      const rect = container.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+
+      let peaceDetected = false;
+      for (const lm of handsLm) {
+        if (isPeace(lm)) peaceDetected = true;
+      }
+      video.classList.toggle("is-blurred", peaceDetected);
+
+      const heart = isTwoHandHeart(handsLm);
+      if (heart) {
+        // video di-mirror (scaleX(-1)), jadi koordinat x perlu dibalik
+        const px = (1 - heart.x) * w;
+        const py = heart.y * h;
+
+        spawnHeart(px + (Math.random() * 40 - 20), py + (Math.random() * 20 - 10), 26 + Math.random() * 16);
+
+        ambientCooldown -= 1;
+        if (ambientCooldown <= 0) {
+          spawnHeart(Math.random() * w, Math.random() * h * 0.8, 20 + Math.random() * 14);
+          ambientCooldown = 3;
+        }
+      }
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  init().catch((err) => {
+    overlayMessage.textContent = "Gagal akses kamera: " + err.message;
+  });
+</script>
+
+</body>
+</html>
